@@ -1,8 +1,30 @@
 # burstclean
 
-Clean, readable document images from any camera. burstclean records about 2 seconds of video, keeps the sharpest frames, lines them up and averages them. Grain and compression speckle fade, and the print stays sharp.
+> Turn 2 seconds of video from a cheap camera into one clean, readable photo of a bill, receipt, payslip or label.
+
+[![PyPI](https://img.shields.io/pypi/v/burstclean)](https://pypi.org/project/burstclean/)
+[![Python](https://img.shields.io/pypi/pyversions/burstclean)](https://pypi.org/project/burstclean/)
+[![CI](https://github.com/Snehodeep/image-processing/actions/workflows/ci.yml/badge.svg)](https://github.com/Snehodeep/image-processing/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+burstclean records a short burst, keeps the sharpest frames, lines them up and averages them. Grain and compression speckle fade, and the print stays sharp.
 
 ![One webcam frame next to 8 frames merged by burstclean](docs/before_after.png)
+
+```bash
+pip install burstclean
+```
+
+```python
+import cv2, burstclean as bc
+result = bc.enhance(bc.capture_burst(camera=0))   # record 2 s, find the page, align, average
+cv2.imwrite("clean.png", result.image)
+```
+
+- **Any camera:** USB webcam, laptop camera, document camera, phone stream, video file or a few photos.
+- **Any printed page:** bills, receipts, invoices, payslips, labels and forms, upright, tilted or sideways.
+- **Measured gain:** +3.8 to +5.8 dB with 5 frames on a fixed camera, +0.5 to +2.9 dB when it shakes ([benchmark](#results)).
+- **Small:** only NumPy and OpenCV; about 0.1 s for 5 frames at 1080p.
 
 ## Why
 
@@ -21,10 +43,10 @@ It works with any source OpenCV can open:
 ## Install
 
 ```bash
-pip install git+https://github.com/Snehodeep/image-processing.git
+pip install burstclean
 ```
 
-It needs Python 3.9 or newer. It installs `numpy` and `opencv-python-headless`.
+For the latest code from GitHub: `pip install git+https://github.com/Snehodeep/image-processing.git`. It needs Python 3.9 or newer. It installs `numpy` and `opencv-python-headless`.
 
 ## Quick start
 

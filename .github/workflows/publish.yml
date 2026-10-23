@@ -17,6 +17,10 @@ jobs:
           python-version: "3.12"
       - run: pip install build
       - run: python -m build
+      - name: Tag matches package version
+        run: |
+          version=$(ls dist/*.whl | sed -E 's/.*burstclean-([^-]+)-.*/\1/')
+          test "v$version" = "$GITHUB_REF_NAME" || { echo "tag $GITHUB_REF_NAME != package $version"; exit 1; }
       - uses: actions/upload-artifact@v4
         with:
           name: dist
