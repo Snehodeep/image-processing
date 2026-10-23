@@ -22,6 +22,18 @@ def _region(value: str):
     return x, y, w, h
 
 
+def _resolution(value: str):
+    if value == "max":
+        return "max"
+    if value == "default":
+        return None
+    try:
+        w, h = (int(v) for v in value.lower().split("x"))
+    except ValueError:
+        raise argparse.ArgumentTypeError("resolution must be max, default or WxH such as 1920x1080") from None
+    return w, h
+
+
 def _parser() -> argparse.ArgumentParser:
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("-o", "--output", required=True, help="where to write the enhanced image (.png or .jpg)")
@@ -40,11 +52,12 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("--version", action="version", version=f"burstclean {__version__}")
     sub = p.add_subparsers(dest="source", required=True)
 
-    cam = sub.add_parser("camera", parents=[common], help="record a short burst from a camera")
+    cam = sub.add_parser("camera", parents=[common], help="record a short burst from any camera or stream")
     cam.add_argument("--camera", default="0", help="camera index or stream URL (default 0)")
     cam.add_argument("--seconds", type=float, default=2.0, help="burst length (default 2)")
-    cam.add_argument("--width", type=int, default=3840, help="requested width (default 3840)")
-    cam.add_argument("--height", type=int, default=2160, help="requested height (default 2160)")
+    cam.add_argument("--resolution", type=_resolution, default="max",
+                     help="max (the camera's largest mode), default (the camera's own default) or WxH "
+                          "such as 1920x1080 (default max)")
     cam.add_argument("--warmup", type=float, default=1.0, help="seconds dropped while exposure settles (default 1)")
 
     vid = sub.add_parser("video", parents=[common], help="use the sharpest frames of a video file")
@@ -62,8 +75,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     try:
         if args.source == "camera":
             camera = int(args.camera) if args.camera.isdigit() else args.camera
-            frames = capture_burst(camera, args.seconds, args.keep,
-                                   resolution=(args.width, args.height), warmup=args.warmup)
+            frames = capture_burst(camera, args.seconds, args.keep, resolution=args.resolution, warmup=args.warmup)
         elif args.source == "video":
             frames = burst_from_video(args.path, args.keep, start=args.start, seconds=args.seconds)
         else:

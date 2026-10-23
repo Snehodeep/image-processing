@@ -11,7 +11,7 @@ from .sharpness import sharpness
 class BestFrames:
     """Streams frames in and keeps only the `keep` sharpest, sharpest first.
 
-    Two seconds of 4K video is about 60 frames and 1.5 GB; scoring each frame as it arrives and
+    Two seconds of video is about 60 frames (1.5 GB at 4K); scoring each frame as it arrives and
     dropping the rest keeps memory at `keep` frames.
 
         best = BestFrames(keep=5)

@@ -3,7 +3,7 @@
     python examples/webcam.py              # camera 0
     python examples/webcam.py 1 --full     # camera 1, merge the whole frame instead of finding a document
 
-Hold the label or page still under the camera while it records.
+Hold the bill, receipt or page still in front of the camera while it records.
 """
 import argparse
 

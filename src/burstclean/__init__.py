@@ -10,7 +10,7 @@ from .pipeline import EnhanceResult, enhance
 from .select import BestFrames
 from .sharpness import sharpness
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
     "BestFrames",

@@ -29,7 +29,7 @@ def enhance(frames: Sequence[np.ndarray], region: Region = "auto", *, sort: bool
     """Pick the sharpest frame as the reference, align the others to it and average them.
 
     `region`:
-      - "auto": find a printed document (label, receipt, page) in the sharpest frame and merge only
+      - "auto": find a printed document (bill, receipt, payslip, label) in the sharpest frame and merge only
         that box; when none is found, the whole frame is merged.
       - "full" or None: the whole frame.
       - (x, y, w, h): that box, in frame pixels.

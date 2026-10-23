@@ -1,8 +1,9 @@
-"""How much cleaner does the label get as more frames are merged?
+"""How much cleaner does a document get as more frames are merged?
 
-Simulates a cheap webcam looking at a shipping label: the camera has a quarter of the scene's
-resolution, the hand or desk shakes by up to 2 px between frames, the sensor adds noise and the
-stream is MJPEG-compressed. Compares, against the noise-free view:
+Simulates a cheap webcam looking at three kinds of document (a payslip, a shop receipt and a
+parcel label): the camera has a quarter of the scene's resolution, the camera or desk shakes by up
+to a few pixels between frames, the sensor adds noise and the stream is MJPEG-compressed.
+Compares, against the noise-free view of the document:
   - a single frame,
   - burstclean (aligned, then averaged),
   - a plain average of the same frames without alignment.
@@ -18,18 +19,41 @@ import numpy as np
 
 import burstclean as bc
 
-FACTOR = 4          # scene pixels per camera pixel
+FACTOR = 4          # scene pixels per camera pixel: a 3840x2160 scene seen at 960x540
 
 
-def scene() -> np.ndarray:
-    """A 3840x2160 parcel scene with a printed label; the camera sees it at 960x540."""
-    img = np.full((2160, 3840, 3), (40, 95, 150), np.uint8)                       # cardboard
-    cv2.rectangle(img, (1300, 560), (2700, 1640), (235, 235, 235), -1)           # label
-    lines = ["SPEED POST  EX000000001IN", "To: A. Kumar", "12 College Main Road",
-             "Bengaluru 560001  Karnataka", "Phone 90000 00000   COD Rs 450", "Wt 0.75 kg"]
+def page(w, h, lines, size, *, table=False):
+    """A printed page with dark text lines and, optionally, table rules."""
+    doc = np.full((h, w, 3), 238, np.uint8)
+    step = int(size * 58)
     for i, line in enumerate(lines):
-        cv2.putText(img, line, (1380, 700 + i * 150), cv2.FONT_HERSHEY_SIMPLEX, 2.6, (25, 25, 25), 5)
+        y = int(size * 60) + i * step
+        cv2.putText(doc, line, (int(size * 30), y), cv2.FONT_HERSHEY_SIMPLEX, size, (25, 25, 25), max(2, int(size * 2)))
+        if table:
+            cv2.line(doc, (int(size * 20), y + step // 3), (w - int(size * 20), y + step // 3), (110, 110, 110), 3)
+    return doc
+
+
+def on_desk(doc, desk):
+    img = np.full((2160, 3840, 3), desk, np.uint8)
+    h, w = doc.shape[:2]
+    y, x = (2160 - h) // 2, (3840 - w) // 2
+    img[y:y + h, x:x + w] = doc
     return img
+
+
+def documents():
+    payslip = page(1700, 1500, ["PAYSLIP  March 2026", "Employee  A. Kumar   ID 10042", "Basic salary     45,000.00",
+                                "HRA              18,000.00", "Provident fund   -5,400.00", "Net pay          57,600.00",
+                                "Account  0000 1111 2222"], 2.4, table=True)
+    receipt = page(760, 1900, ["CITY MART", "12/03/2026 18:42", "Rice 5kg    410.00", "Milk 1L      56.00",
+                               "Bread        45.00", "Eggs x12     84.00", "TOTAL       595.00", "UPI   Ref 88821",
+                               "Thank you"], 1.7)
+    label = page(1400, 1080, ["SPEED POST  EX000000001IN", "To: A. Kumar", "12 College Main Road",
+                              "Bengaluru 560001  Karnataka", "Phone 90000 00000   COD Rs 450", "Wt 0.75 kg"], 2.6)
+    return {"payslip": on_desk(payslip, (45, 45, 50)),            # dark desk
+            "receipt": on_desk(receipt, (60, 105, 160)),          # wooden table
+            "parcel label": on_desk(label, (40, 95, 150))}        # cardboard
 
 
 def camera(sc, dx, dy, rng, sigma, jpeg):
@@ -57,6 +81,25 @@ def burst(sc, shake, n, rng, sigma, jpeg):
     return [camera(sc, dx, dy, rng, sigma, jpeg) for dx, dy in moves]
 
 
+def save_picture(frames, directory):
+    r = bc.enhance(frames, "auto", sort=False)
+    _, _, w, h = r.box
+
+    def zoom(im, caption):
+        im = cv2.resize(im[h // 30:h // 30 + h * 2 // 5, w // 20:w // 20 + w * 3 // 5], None,
+                        fx=2, fy=2, interpolation=cv2.INTER_NEAREST)
+        bar = np.full((44, im.shape[1], 3), 255, np.uint8)
+        cv2.putText(bar, caption, (8, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (60, 60, 60), 2, cv2.LINE_AA)
+        return np.vstack([bar, im])
+
+    a, b = zoom(r.reference, "1 frame"), zoom(r.image, f"{r.used} frames, burstclean")
+    gap = np.full((a.shape[0], 12, 3), 255, np.uint8)
+    os.makedirs(directory, exist_ok=True)
+    out = os.path.join(directory, "before_after.png")
+    cv2.imwrite(out, np.hstack([a, gap, b]))
+    print(f"wrote {out} (left: single frame, right: {r.used} frames merged)")
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--sigma", type=float, default=10.0, help="sensor noise, grey levels (default 10)")
@@ -67,52 +110,47 @@ def main():
     p.add_argument("--save", metavar="DIR", help="write before_after.png (single frame vs. 8 merged) here")
     args = p.parse_args()
 
-    sc = scene()
-    clean = camera(sc, 0, 0, None, 0, 0)
     counts = (1, 2, 3, 5, 8)
     shake_max = max(args.shakes)
+    docs = documents()
     single = []
     aligned = {(s, n): [] for s in args.shakes for n in counts}
     plain = {n: [] for n in counts}           # plain average at the largest shake
-    for t in range(args.trials):
-        for shake in args.shakes:
-            frames = burst(sc, shake, max(counts), np.random.default_rng(t), args.sigma, args.jpeg)
-            for n in counts:
-                r = bc.enhance(frames[:n], "auto", sort=False)       # frame 0 is the reference
-                x, y, w, h = r.box
-                truth = clean[y:y + h, x:x + w]
-                aligned[shake, n].append(psnr(r.image, truth))
-                if n == 1 and shake == args.shakes[0]:
-                    single.append(psnr(r.reference, truth))
-                if shake == shake_max:
-                    avg = np.mean([f[y:y + h, x:x + w].astype(np.float32) for f in frames[:n]], axis=0)
-                    plain[n].append(psnr(np.clip(avg + 0.5, 0, 255).astype(np.uint8), truth))
-            if args.save and t == 0 and shake == args.shakes[0]:
-                r = bc.enhance(frames, "auto", sort=False)
-                x, y, w, h = r.box
-                def zoom(im, caption):
-                    im = cv2.resize(im[h // 16:h // 16 + h // 3, w // 16:w // 16 + w // 2], None,
-                                    fx=3, fy=3, interpolation=cv2.INTER_NEAREST)
-                    bar = np.full((44, im.shape[1], 3), 255, np.uint8)
-                    cv2.putText(bar, caption, (8, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (60, 60, 60), 2, cv2.LINE_AA)
-                    return np.vstack([bar, im])
-                a = zoom(r.reference, "1 frame")
-                b = zoom(r.image, f"{r.used} frames, burstclean")
-                gap = np.full((a.shape[0], 12, 3), 255, np.uint8)
-                os.makedirs(args.save, exist_ok=True)
-                out = os.path.join(args.save, "before_after.png")
-                cv2.imwrite(out, np.hstack([a, gap, b]))
-                print(f"wrote {out} (left: single frame, right: {r.used} frames merged, shake {shake:g} px)")
+    per_doc = {name: [] for name in docs}     # fixed camera, 5 frames: gain over one frame
+    for name, sc in docs.items():
+        clean = camera(sc, 0, 0, None, 0, 0)
+        for t in range(args.trials):
+            for shake in args.shakes:
+                frames = burst(sc, shake, max(counts), np.random.default_rng(t), args.sigma, args.jpeg)
+                for n in counts:
+                    r = bc.enhance(frames[:n], "auto", sort=False)       # frame 0 is the reference
+                    assert r.document_found, f"{name}: document not found"
+                    x, y, w, h = r.box
+                    truth = clean[y:y + h, x:x + w]
+                    aligned[shake, n].append(psnr(r.image, truth))
+                    if n == 1 and shake == args.shakes[0]:
+                        single.append(psnr(r.reference, truth))
+                        first = single[-1]
+                    if n == 5 and shake == 0.0:
+                        per_doc[name].append(aligned[shake, n][-1] - first)
+                    if shake == shake_max:
+                        avg = np.mean([f[y:y + h, x:x + w].astype(np.float32) for f in frames[:n]], axis=0)
+                        plain[n].append(psnr(np.clip(avg + 0.5, 0, 255).astype(np.uint8), truth))
+                if args.save and name == "payslip" and t == 0 and shake == args.shakes[0]:
+                    save_picture(frames, args.save)
 
-    print(f"\nLabel region, camera 960x540, noise sigma {args.sigma:g}, JPEG {args.jpeg or 'off'}, "
-          f"{args.trials} trials. PSNR against the noise-free view in dB, higher is better. "
-          f"Single frame: {np.mean(single):.1f} dB.\n")
+    print(f"\nDocument region, camera 960x540, noise sigma {args.sigma:g}, JPEG {args.jpeg or 'off'}, "
+          f"{len(docs)} documents x {args.trials} trials. PSNR against the noise-free view in dB, higher "
+          f"is better. Single frame: {np.mean(single):.1f} dB.\n")
     head = " | ".join(f"burstclean, shake {s:g} px" for s in args.shakes)
     print(f"| Frames | {head} | Plain average, shake {shake_max:g} px |")
     print("| --- |" + " --- |" * (len(args.shakes) + 1))
     for n in counts:
         cells = " | ".join(f"{np.mean(aligned[s, n]):.1f}" for s in args.shakes)
         print(f"| {n} | {cells} | {np.mean(plain[n]):.1f} |")
+    if 0.0 in args.shakes:
+        print("\nFixed camera, 5 frames, gain over one frame: "
+              + ", ".join(f"{name} +{np.mean(g):.1f} dB" for name, g in per_doc.items()))
 
 
 if __name__ == "__main__":

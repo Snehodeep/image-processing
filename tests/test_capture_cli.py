@@ -40,9 +40,18 @@ def test_capture_burst_reads_a_stream_source(video):
     assert 1 <= len(frames) <= 4
 
 
-def test_capture_burst_bad_source():
+@pytest.mark.parametrize("resolution", ["max", (640, 480)])
+def test_capture_burst_requested_resolution_falls_back(video, resolution):
+    # A file ignores the size request, like a camera without that mode: frames still come through
+    frames = capture_burst(video, seconds=5, keep=2, resolution=resolution, warmup=0)
+    assert len(frames) == 2
+
+
+def test_capture_burst_bad_source_and_resolution(video):
     with pytest.raises(RuntimeError):
         capture_burst("/no/such/file.avi", seconds=0.1, warmup=0)
+    with pytest.raises(ValueError):
+        capture_burst(video, resolution="4k")
 
 
 def test_cli_files_writes_output_and_reference(tmp_path, capsys):

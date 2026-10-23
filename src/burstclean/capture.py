@@ -10,24 +10,47 @@ import numpy as np
 from .select import BestFrames
 
 MAX_FAILED_READS = 30
+MAX_REQUEST = (10000, 10000)   # drivers answer an oversized request with their largest mode
+
+Resolution = Union[str, Tuple[int, int], None]
 
 
-def capture_burst(camera: Union[int, str] = 0, seconds: float = 2.0, keep: int = 5, *,
-                  resolution: Optional[Tuple[int, int]] = (3840, 2160), warmup: float = 1.0) -> List[np.ndarray]:
-    """Record `seconds` of video from `camera` and return the `keep` sharpest frames, sharpest first.
-
-    `resolution` is requested from the camera; text readability is set by camera pixels, so the
-    default asks for 4K and a camera without it falls back to a mode it has (None keeps the camera's
-    default). The first `warmup` seconds are dropped while auto exposure and focus settle.
-    Hold the subject still: frames that moved are left out when they are merged.
-    """
+def _open_camera(camera: Union[int, str], resolution: Resolution) -> cv2.VideoCapture:
+    if isinstance(resolution, str) and resolution != "max":
+        raise ValueError(f"resolution must be 'max', None or (width, height), not {resolution!r}")
     cap = cv2.VideoCapture(camera)
     if not cap.isOpened():
         raise RuntimeError(f"could not open camera {camera!r}")
+    if resolution is None:
+        return cap
+    w, h = MAX_REQUEST if resolution == "max" else resolution
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, w)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, h)
+    ok, frame = cap.read()
+    if ok and frame is not None:
+        return cap
+    # A few drivers refuse a mode they do not have instead of picking the nearest: use the default
+    cap.release()
+    cap = cv2.VideoCapture(camera)
+    if not cap.isOpened():
+        raise RuntimeError(f"could not open camera {camera!r}")
+    return cap
+
+
+def capture_burst(camera: Union[int, str] = 0, seconds: float = 2.0, keep: int = 5, *,
+                  resolution: Resolution = "max", warmup: float = 1.0) -> List[np.ndarray]:
+    """Record `seconds` of video from `camera` and return the `keep` sharpest frames, sharpest first.
+
+    Works with any source OpenCV can open: a camera index (USB webcam, laptop camera, document
+    camera) or a stream URL (for example a phone running an IP-camera app).
+
+    Small print is readable only with enough camera pixels, so `resolution="max"` asks the camera
+    for its largest mode. Pass (width, height) to ask for a specific mode, or None to keep the
+    camera's default. The first `warmup` seconds are dropped while auto exposure and focus settle.
+    Hold the subject still: frames that moved are left out when they are merged.
+    """
+    cap = _open_camera(camera, resolution)
     try:
-        if resolution:
-            cap.set(cv2.CAP_PROP_FRAME_WIDTH, resolution[0])
-            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, resolution[1])
         cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)        # always read the newest frame
         cap.set(cv2.CAP_PROP_AUTOFOCUS, 1)
 

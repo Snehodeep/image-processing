@@ -48,3 +48,48 @@ def camera_view(scene: np.ndarray, dx: float = 0.0, dy: float = 0.0, factor: int
 def inside(inner, box) -> bool:
     x, y, w, h = box
     return x <= inner[0] and y <= inner[1] and inner[2] <= x + w and inner[3] <= y + h
+
+
+WOOD, DARK_DESK, GREY_DESK, CLOTH = (60, 105, 160), (45, 45, 50), (175, 178, 180), (120, 60, 160)
+_LINES = ["Basic salary      45,000.00", "HRA               18,000.00", "Total due     Rs 1,240.50",
+          "Item  Qty  Rate  Amount", "Account no 0000 1111 2222", "Date 12/03/2026  Ref 88821"]
+
+
+def document(w, h, size, *, margin=40, table=False, header=None):
+    """A printed page w x h: lines of text, optional table rules and a coloured header band."""
+    doc = np.full((h, w, 3), 240, np.uint8)
+    step = int(size * 42)
+    y = int(size * 40)
+    if header:
+        cv2.rectangle(doc, (0, 0), (w, int(h * 0.1)), header, -1)
+        cv2.putText(doc, "INVOICE", (margin, int(h * 0.07)), cv2.FONT_HERSHEY_SIMPLEX, size * 1.6,
+                    (255, 255, 255), max(2, int(size * 3)))
+        y = int(h * 0.1) + step
+    i = 0
+    while y < h - step // 2:
+        cv2.putText(doc, f"{i + 1:02d} {_LINES[i % len(_LINES)]}", (margin, y), cv2.FONT_HERSHEY_SIMPLEX, size, (25, 25, 25),
+                    max(1, int(size * 2)))
+        if table:
+            cv2.line(doc, (margin - 10, y + step // 3), (w - 30, y + step // 3), (90, 90, 90), 1)
+        y += step
+        i += 1
+    if table:
+        cv2.line(doc, (w // 2, int(h * 0.12)), (w // 2, y - step // 2), (90, 90, 90), 1)
+    return doc
+
+
+def on_desk(doc, desk, center=(960, 540), angle=0.0, size=(1920, 1080)):
+    """`doc` lying on a plain desk colour, rotated by `angle` degrees. Returns the frame and the
+    document's bounding box as (x1, y1, x2, y2)."""
+    W, H = size
+    h, w = doc.shape[:2]
+    m = cv2.getRotationMatrix2D((w / 2, h / 2), angle, 1.0)
+    m[0, 2] += center[0] - w / 2
+    m[1, 2] += center[1] - h / 2
+    mask = cv2.warpAffine(np.full((h, w), 255, np.uint8), m, (W, H)) > 127
+    frame = np.full((H, W, 3), desk, np.uint8)
+    frame[mask] = cv2.warpAffine(doc, m, (W, H))[mask]
+    corners = cv2.transform(np.float32([[0, 0], [w, 0], [w, h], [0, h]])[None], m)[0]
+    x1, y1 = np.floor(corners.min(0)).astype(int)
+    x2, y2 = np.ceil(corners.max(0)).astype(int)
+    return frame, (int(x1), int(y1), int(x2), int(y2))
