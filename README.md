@@ -5,11 +5,11 @@
 [![PyPI](https://img.shields.io/pypi/v/burstclean)](https://pypi.org/project/burstclean/)
 [![Python](https://img.shields.io/pypi/pyversions/burstclean)](https://pypi.org/project/burstclean/)
 [![CI](https://github.com/Snehodeep/image-processing/actions/workflows/ci.yml/badge.svg)](https://github.com/Snehodeep/image-processing/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Snehodeep/image-processing/blob/main/LICENSE)
 
 burstclean records a short burst, keeps the sharpest frames, lines them up and averages them. Grain and compression speckle fade, and the print stays sharp.
 
-![One webcam frame next to 8 frames merged by burstclean](docs/before_after.png)
+![One webcam frame next to 8 frames merged by burstclean](https://raw.githubusercontent.com/Snehodeep/image-processing/main/docs/before_after.png)
 
 ```bash
 pip install burstclean
@@ -23,7 +23,7 @@ cv2.imwrite("clean.png", result.image)
 
 - **Any camera:** USB webcam, laptop camera, document camera, phone stream, video file or a few photos.
 - **Any printed page:** bills, receipts, invoices, payslips, labels and forms, upright, tilted or sideways.
-- **Measured gain:** +3.8 to +5.8 dB with 5 frames on a fixed camera, +0.5 to +2.9 dB when it shakes ([benchmark](#results)).
+- **Measured gain:** +3.8 to +5.8 dB with 5 frames on a fixed camera, +0.5 to +2.9 dB when it shakes ([benchmark](https://github.com/Snehodeep/image-processing#results)).
 - **Small:** only NumPy and OpenCV; about 0.1 s for 5 frames at 1080p.
 
 ## Why
@@ -107,7 +107,7 @@ merged 4 of 5 frames · 748x962 at (586, 59) · document found -> payslip.png
 
 ## Results
 
-[`examples/benchmark.py`](examples/benchmark.py) simulates a cheap webcam looking at three documents: a payslip, a shop receipt and a parcel label.
+[`examples/benchmark.py`](https://github.com/Snehodeep/image-processing/blob/main/examples/benchmark.py) simulates a cheap webcam looking at three documents: a payslip, a shop receipt and a parcel label.
 
 - 960×540 camera
 - sensor noise σ = 10 grey levels
@@ -178,4 +178,4 @@ pytest
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](https://github.com/Snehodeep/image-processing/blob/main/LICENSE).
