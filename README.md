@@ -125,6 +125,7 @@ Run it yourself with `python examples/benchmark.py`. Add `--save docs` to write 
 
 - **Translation only.** Rotation, zoom and perspective change between frames are not modelled. They are small for a camera on a stand. Frames where they are large fail the shift or response check and are left out.
 - **The subject must be still** for the burst. Moving parts inside the region blur.
+- **It needs some detail to align on.** In a nearly featureless region (a blank wall) under heavy noise, the correlation peak is weak. Frames are then left out as `low_response`, so less noise is removed, but the result is never worse than the single sharpest frame. Printed text gives plenty to align on.
 - **The document finder is a heuristic.** It looks for light paper with dark print against a darker or coloured background. On other scenes, pass the region yourself or use `"full"`.
 - **Speed.** On 4K frames with 5 kept frames, merging a label-sized region takes about 0.2 s, and the whole frame about 1 s (Apple M1). Scoring sharpness takes about 8 ms per frame.
 - **No sharpening or contrast changes.** The output is the camera's own image with the noise averaged out, which is usually what OCR and vision models read best.
